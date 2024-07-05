@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "PROD"
+  },
+  {
+    "ParameterKey": "EnvironmentLowercase",
+    "ParameterValue": "prod"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "nota.telehealthcore.org"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "NONPROD"
+  },
+  {
+    "ParameterKey": "EnvironmentLowercase",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "ListenerARN",
+    "ParameterValue": "arn:aws:elasticloadbalancing:ap-southeast-1:238214663084:listener/app/peace-dev-web-service-alb/689e2850037d39c3/9377263ed3f35989"
+  },
+  {
+    "ParameterKey": "LoadBalancerSecurityGroupId",
+    "ParameterValue": "sg-005f9180f69f9a1f4"
+  },
+  {
+    "ParameterKey": "FargateCPU",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "FargateMemory",
+    "ParameterValue": "0.5GB"
+  }
+]

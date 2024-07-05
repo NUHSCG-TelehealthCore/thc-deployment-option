@@ -1,0 +1,260 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: THC Application - ECS - Stack for nota Web Service Task.
+Parameters:
+  Environment:
+    Description: Environment for application
+    Type: String
+    Default: NONPROD
+    AllowedValues:
+      - DEV
+      - QA
+      - STG
+      - PROD
+      - NONPROD
+    ConstraintDescription: Must be a valid environment.
+  EnvironmentLowercase:
+    Description: Environment for application in lower case
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - stg
+      - prod
+      - nonprod
+    ConstraintDescription: Must be a valid environment.
+  LogRetentionInDays:
+    Description: The number of days to retain the log events
+    Type: Number
+    Default: 90
+    AllowedValues : [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180,365, 400, 545, 731, 1827]
+  FargateCPU:
+    Description: Task CPU (vCPU)
+    Type: String
+    Default: 512
+    AllowedValues : [256,512,1024,2048,4096]
+  FargateMemory:
+    Description: Task memory (GB)
+    Type: String
+    Default: 3GB
+    AllowedValues : [0.5GB,1GB,2GB,3GB,4GB]
+  ContainerPort:
+    Type: Number
+    Default: 8080
+  VPCID:
+    Description: Id of and existing VPC
+    Type: String
+    Default: vpc-0490e39748d66a249
+    ConstraintDescription: Must be a valid VPC.
+  LoadBalancerPort:
+    Type: Number
+    Default: 80
+  HealthCheckPath:
+    Type: String
+    Default: /
+  SubNet1:
+    Description: 'Private subnet for confidential apps '
+    Type: String
+    Default: subnet-0d9e318c5cbae9a00
+    ConstraintDescription: Must be a valid Private Subnet.
+  SubNet2:
+    Description: 'Private subnet for confidential apps '
+    Type: String
+    Default: subnet-0556edf0087659e4a
+    ConstraintDescription: Must be a valid Private Subnet.
+  LoadBalancerSecurityGroupId:
+    Description: SecurityGroupId of the load balancer
+    Type: String
+    Default: sg-09303d0fa413d54d3
+  ListenerARN:
+    Description: ARN of load balancer port 443 listener
+    Type: String
+    Default: arn:aws:elasticloadbalancing:ap-southeast-1:238214663084:listener/app/peace-dev-web-service-alb/20a927aeb74eca68/a8e7cde0e868a7c8
+Conditions:
+  isProd: !Equals [ !Ref EnvironmentLowercase, prod ]
+
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub thc-${EnvironmentLowercase}-cluster
+  NotaWebServiceFargateTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub thc-${EnvironmentLowercase}-ws-fargate-task-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/thc-fargate-task-role-policy
+  NotaWebServiceFargateTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub peace-${EnvironmentLowercase}-ws-fargate-task-execution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/peace-fargate-task-execution-role-policy
+      Tags:
+        - Key: Technical:ApplicationName
+          Value:
+            Ref: ApplicationName
+        - Key: Technical:PlatformOwner
+          Value:
+            Ref: Owner
+        - Key: Technical:Environment
+          Value:
+            Ref: Environment
+  ECRWebServiceTaskDefinition:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      Cpu: !Ref  FargateCPU
+      ExecutionRoleArn: !Ref  NotaWebServiceFargateTaskExecutionRole
+      Family: !Sub thc-${EnvironmentLowercase}-ws-def
+      Memory: !Ref  FargateMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !Ref   NotaWebServiceFargateTaskRole
+      ContainerDefinitions:
+        - Essential: true
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.ap-southeast-1.amazonaws.com/thc-nota-${EnvironmentLowercase}-ws-ecr-repository:latest
+          Name: !Sub peace-${EnvironmentLowercase}-ws-container
+          Environment:
+            - Name: ENV
+              Value: !Ref EnvironmentLowercase
+            - Name: TZ
+              Value: UTC
+          Secrets:
+            - Name: ADMIN_JWT_SECRET
+              ValueFrom: !Sub  arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/JWT_SECRET
+            - Name: API_TOKEN_SALT
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/API_TOKEN_SALT
+            - Name: JWT_SECRET
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/JWT_SECRET
+            - Name: DATABASE_HOST
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/db/DATABASE_HOST
+            - Name: DATABASE_NAME
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/db/DATABASE_NAME
+            - Name: DATABASE_USERNAME
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/db/DATABASE_USERNAME
+            - Name: DATABASE_PASSWORD
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/db/DATABASE_PASSWORD
+            - Name: APP_KEYS
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/app_keys
+            - Name: TRANSFER_TOKEN_SALT
+              ValueFrom: !Sub arn:aws:ssm:ap-southeast-1:742143721824:parameter/thc/nota/ws/TRANSFER_TOKEN_SALT
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: { "Ref":   ECSWebServiceLogGroup }
+              awslogs-region: ap-southeast-1
+              awslogs-stream-prefix: ecs
+          PortMappings:
+            - ContainerPort: 8080
+    DependsOn:
+      - NotaWebServiceFargateTaskRole
+      - NotaWebServiceFargateTaskExecutionRole
+
+  ECSWebServiceLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub logs/peace-${EnvironmentLowercase}-ws
+      RetentionInDays: !Ref  LogRetentionInDays
+
+
+#Service Creation
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub peace-${EnvironmentLowercase}-ws-security-group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroupId
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub peace-${EnvironmentLowercase}-ws
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref  ECRWebServiceTaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 240
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubNet1
+            - !Ref SubNet2
+            - !Ref SubNet3
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: !Sub peace-${EnvironmentLowercase}-ws-container
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroup
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub peace-${EnvironmentLowercase}-web-service-tg
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 45
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 5
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      TargetType: ip
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: !Sub peace-${EnvironmentLowercase}-web-service-tg
+        - Key: Technical:ApplicationName
+          Value:
+            Ref: ApplicationName
+        - Key: Technical:PlatformOwner
+          Value:
+            Ref: Owner
+        - Key: Technical:Environment
+          Value:
+            Ref: Environment
+
+  ListenerRule:
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - /*
+      ListenerArn: !Ref ListenerARN
+      Priority: 1

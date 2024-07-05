@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: NOTA Application - ECR - Stack for Web Service Task.
+Parameters:
+  Environment:
+    Description: Environment for application
+    Type: String
+    Default: NONPROD
+    AllowedValues:
+      - DEV
+      - STG
+      - PROD
+      - NONPROD
+    ConstraintDescription: Must be a valid environment.
+  EnvironmentLowercase:
+    Description: Environment for application in lower case
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - stg
+      - prod
+      - nonprod
+    ConstraintDescription: Must be a valid environment.
+
+Resources:
+  ECRWebServiceRepo:
+    Type: "AWS::ECR::Repository"
+    Properties:
+      RepositoryName: !Sub thc-nota-${EnvironmentLowercase}-ws-ecr-repository

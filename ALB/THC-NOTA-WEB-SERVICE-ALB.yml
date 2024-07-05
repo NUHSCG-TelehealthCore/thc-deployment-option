@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: THC NOTA Application - ECS - Stack for Web Service Task.
+Parameters:
+  Environment:
+    Description: Environment for application
+    Type: String
+    Default: NONPROD
+    AllowedValues:
+      - DEV
+      - QA
+      - STG
+      - PROD
+      - NONPROD
+    ConstraintDescription: Must be a valid environment.
+  EnvironmentLowercase:
+    Description: Environment for application in lower case
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - stg
+      - prod
+      - nonprod
+    ConstraintDescription: Must be a valid environment.
+  ContainerPort:
+    Type: Number
+    Default: 8080
+  VPCID:
+    Description: Id of an existing VPC
+    Type: String
+    Default: vpc-0490e39748d66a249
+    ConstraintDescription: Must be a valid VPC.
+  LoadBalancerPort:
+    Type: Number
+    Default: 443
+  SubNet1:
+    Description: 'Public subnet for confidential apps '
+    Type: String
+    Default: subnet-03f45c70c650b242c
+    ConstraintDescription: Must be a valid Public Subnet.
+  SubNet2:
+    Description: 'Public subnet for confidential apps '
+    Type: String
+    Default: subnet-0088a254a9e49696f
+    ConstraintDescription: Must be a valid Public Subnet.
+  DomainName:
+    Description: Domain name for the thc nota alb
+    Type: String
+    Default: nota.telehealthcore.org
+  SslCertificateARN:
+    Description: ARN of ssl certificate
+    Type: String
+    Default: arn:aws:acm:ap-southeast-1:742143721824:certificate/4f2550f8-88c8-4f5c-b838-82836ab1d5c3
+  R53Zone:
+    Description: The hosted zone for the Route53
+    Type : String
+    Default: Z08724653QJHQND9EVZT0
+    MinLength: '1'
+    MaxLength: '255'
+Resources:
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub thc-${EnvironmentLowercase}-ws-nota-alb-sg
+      GroupDescription: !Sub thc-${EnvironmentLowercase}-ws-nota-alb-sg
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref LoadBalancerPort
+          ToPort: !Ref LoadBalancerPort
+          CidrIp: 0.0.0.0/0
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      Name: !Sub thc-${EnvironmentLowercase}-nota-ws-alb
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref SubNet1
+        - !Ref SubNet2
+  LoadBalancingListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref SslCertificateARN
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '404'
+            ContentType: 'application/json'
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+  LoadBalancerRecordIPV4:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+      HostedZoneId: !Ref R53Zone
+      Name: !Ref DomainName
+      Type: A

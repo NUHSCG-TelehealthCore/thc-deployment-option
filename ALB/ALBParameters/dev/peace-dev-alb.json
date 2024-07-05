@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "NONPROD"
+  },
+  {
+    "ParameterKey": "EnvironmentLowercase",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "cms-dev.careverse.sg"
+  }
+]
